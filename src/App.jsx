@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, Fragment } from 'react'
 import { Sun, Moon } from 'lucide-react'
 import Logo from './components/Logo'
 import { Arrow, Lock } from './components/Icons'
@@ -143,6 +143,18 @@ function Survey({ preguntas, onFinish, enviando, errorEnvio, titulo, bajada, tem
     return () => window.removeEventListener('keydown', onKey)
   }, [step, respuestas]) // eslint-disable-line
 
+  // Agrupa opciones consecutivas con el mismo grupo (para <optgroup>)
+  function agruparOpciones(ops) {
+    const bloques = []
+    for (const o of ops) {
+      const grupo = (o.grupo || '').trim()
+      const ult = bloques[bloques.length - 1]
+      if (ult && ult.grupo === grupo) ult.items.push(o)
+      else bloques.push({ grupo, items: [o] })
+    }
+    return bloques
+  }
+
   function opcionesDe(pregunta) {
     if (pregunta.tipo === 'si_no') return [{ id: 'si', texto: 'Sí' }, { id: 'no', texto: 'No' }].map(o => o.texto)
     return (pregunta.opciones || []).map(o => o.texto)
@@ -215,12 +227,17 @@ function Survey({ preguntas, onFinish, enviando, errorEnvio, titulo, bajada, tem
                 <div className={'options ' + (q.tipo === 'checkbox' ? 'grid' : '')} role="group" aria-label={q.texto}>
                   {(q.opciones || []).map((opcion, i) => {
                     const selected = q.tipo === 'checkbox' ? (value || []).some(o => o.id === opcion.id) : value?.id === opcion.id
+                    const grupo = (opcion.grupo || '').trim()
+                    const grupoPrev = i > 0 ? (q.opciones[i - 1].grupo || '').trim() : ''
                     return (
-                      <button key={opcion.id} className={'option ' + (selected ? 'selected' : '')} aria-pressed={selected} onClick={() => choose(opcion)}>
-                        <span className="letter">{String.fromCharCode(65 + i)}</span>
-                        <span>{opcion.texto}</span>
-                        <span className="option-end" aria-hidden="true">{selected ? '✓' : '+'}</span>
-                      </button>
+                      <Fragment key={opcion.id}>
+                        {grupo && grupo !== grupoPrev && <div className="option-group" aria-hidden="true">{grupo}</div>}
+                        <button className={'option ' + (selected ? 'selected' : '')} aria-pressed={selected} onClick={() => choose(opcion)}>
+                          <span className="letter">{String.fromCharCode(65 + i)}</span>
+                          <span>{opcion.texto}</span>
+                          <span className="option-end" aria-hidden="true">{selected ? '✓' : '+'}</span>
+                        </button>
+                      </Fragment>
                     )
                   })}
                 </div>
@@ -241,7 +258,9 @@ function Survey({ preguntas, onFinish, enviando, errorEnvio, titulo, bajada, tem
               {q.tipo === 'desplegable' && (
                 <select className="select-native" value={value?.id || ''} onChange={e => choose((q.opciones || []).find(o => o.id === e.target.value))}>
                   <option value="" disabled>Elegí una opción</option>
-                  {(q.opciones || []).map(o => <option key={o.id} value={o.id}>{o.texto}</option>)}
+                  {agruparOpciones(q.opciones || []).map((bloque, bi) => bloque.grupo
+                    ? <optgroup key={bi} label={bloque.grupo}>{bloque.items.map(o => <option key={o.id} value={o.id}>{o.texto}</option>)}</optgroup>
+                    : bloque.items.map(o => <option key={o.id} value={o.id}>{o.texto}</option>))}
                 </select>
               )}
 
